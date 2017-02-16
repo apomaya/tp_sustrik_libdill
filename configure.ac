@@ -56,6 +56,7 @@ AC_MSG_NOTICE([libdill ABI version: $DILL_ABI_VERSION])
 #  Check the compilers.                                                        #
 ################################################################################
 
+AC_PROG_CXX
 AC_PROG_CC_C99
 AM_PROG_CC_C_O
 
