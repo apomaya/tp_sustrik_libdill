@@ -60,13 +60,6 @@ libdill_la_SOURCES = \
     utils.h \
     utils.c
 
-if DILL_SOCKETS
-libdill_la_SOURCES += \
-    ipaddr.c \
-    dns/dns.h \
-    dns/dns.c
-endif
-
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libdill.pc
 

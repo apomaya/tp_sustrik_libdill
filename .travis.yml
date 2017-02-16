@@ -14,36 +14,6 @@ matrix:
         packages:
           - gcc-4.9
           - gcc++-4.9
-  - os: linux
-    compiler: clang
-    env: 
-    addons:
-      apt:
-        sources:
-          - ubuntu-toolchain-r-test
-        packages:
-          - clang
-          - clang++
-  - os: linux
-    compiler: gcc
-    env: STATIC=1
-    addons:
-      apt:
-        sources:
-          - ubuntu-toolchain-r-test
-        packages:
-          - gcc-4.9
-          - gcc++-4.9
-  - os: linux
-    compiler: clang
-    env: STATIC=1
-    addons:
-      apt:
-        sources:
-          - ubuntu-toolchain-r-test
-        packages:
-          - clang
-          - clang++
 
 branches:
   except:
