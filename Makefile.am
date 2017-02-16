@@ -57,6 +57,8 @@ libdill_la_SOURCES = \
     stack.c \
     ctx.h \
     ctx.c \
+    genhash.c \
+    genhash.h \
     utils.h
 
 pkgconfigdir = $(libdir)/pkgconfig
