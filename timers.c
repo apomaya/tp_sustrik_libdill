@@ -14,14 +14,21 @@ void dill_timers_init(struct dill_timers *timers, int64_t now, timer_fired_callb
 unsigned dill_timers_sleep_for(struct dill_timers *timers, int64_t now,
                                unsigned max_sleep) {
     int64_t delta = 0;
-    if(timers->nearest_deadline == now) {
+    if(timers->nearest_deadline > now) {
+        delta = timers->nearest_deadline - now;
+        if(delta > max_sleep) delta = max_sleep;
+        fprintf(stderr, "Calculated delta %d\n", (int)delta);
+    } else {
         while(
             !timers->buckets[timers->nearest_deadline % DILL_TIMERS_NBUCKETS]) {
             timers->nearest_deadline++;
             delta = timers->nearest_deadline - now;
-            if(delta >= max_sleep)
+            if(delta >= max_sleep) {
+                delta = max_sleep;
                 break;
+            }
         }
+        fprintf(stderr, "Computed delta %d\n", (int)delta);
     }
     return delta;
 }
@@ -32,7 +39,7 @@ unsigned dill_timers_expire(struct dill_timers *timers, int64_t now) {
     for(; timers->current_now <= now; timers->current_now++) {
         struct dill_timer_handle **bucket =
             &timers->buckets[timers->current_now % DILL_TIMERS_NBUCKETS];
-        fprintf(stderr, "Current      now %lld now %lld bucket %p\n", timers->current_now, now, *bucket);
+        fprintf(stderr, "Current now %lld; now %lld bucket %p\n", timers->current_now, now, *bucket);
         struct dill_timer_handle *timer = *bucket;
         if(dill_slow(timer)) { /* Not all buckets are filled with timers. */
             struct dill_timer_handle *nt = NULL;
@@ -64,6 +71,8 @@ unsigned dill_timers_expire(struct dill_timers *timers, int64_t now) {
     if(timers->nearest_deadline < timers->current_now)
         timers->nearest_deadline = timers->current_now;
 
+    fprintf(stderr, "Timer next nearest deadline %lld, now %lld, n_fired=%d\n",
+        timers->nearest_deadline, now, n_fired);
     return n_fired;
 }
 

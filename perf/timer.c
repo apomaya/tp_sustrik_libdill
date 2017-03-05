@@ -59,9 +59,12 @@ int main(int argc, char *argv[]) {
     for(i = 0; i != count; ++i) {
         int h = go(worker(nw, i, count));
     }
-    sleep((BASE_TIME / 1000) + 1);
-    yield();
-    yield();
+    while(!stop) {
+        printf("while(!stop) msleep\n");
+        msleep(now() + 250);
+    }
+
+    printf("finished\n");
 
     long duration = (long)(stop - start);
     long ns = (duration * 1000000) / count;

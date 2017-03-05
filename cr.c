@@ -59,6 +59,7 @@ static void dill_resume(struct dill_cr *cr, int id, int err) {
     struct dill_ctx_cr *ctx = &dill_getctx->cr;
     cr->id = id;
     cr->err = err;
+    fprintf(stderr, "%lld dill_resume called()\n", now());
     dill_qlist_push(&ctx->ready, &cr->ready);
 }
 
@@ -338,22 +339,23 @@ int dill_wait(void)  {
        very well be a deadline or a user-issued command that cancels the CPU
        intensive operation. */
     int block = dill_qlist_empty(&ctx->ready);
-    fprintf(stderr, "blah: %d\n", block);
+    fprintf(stderr, "block: %d\n", block);
     if(block || nw > ctx->last_poll + 1000) {
         while(1) {
             /* Compute the timeout for the subsequent poll. */
             int timeout = 0;
             if(block) {
+    fprintf(stderr, "%lld trying to figure out how long to sleep\n", now());
                 timeout = dill_timers_sleep_for(&ctx->timers, nw, 1000);
             }
             /* Wait for events. */
-    fprintf(stderr, "polling with timeout %d\n", timeout);
+    fprintf(stderr, "%lld polling with timeout %d\n", now(), timeout);
             int fired = dill_pollset_poll(timeout);
             nw = now();
             if(dill_slow(fired < 0)) continue;
             /* Fire all expired timers. */
         
-    fprintf(stderr, "expiring timers\n");
+    fprintf(stderr, "%lld expiring timers\n", now());
             fired = dill_timers_expire(&ctx->timers, nw); /* Number of expired timers */
     fprintf(stderr, "expiring timers => %d timers fired\n", fired);
             /* Never retry the poll when in non-blocking mode. */
@@ -367,6 +369,7 @@ int dill_wait(void)  {
     }
     /* There's a coroutine ready to be executed so jump to it. */
     struct dill_slist *it = dill_qlist_pop(&ctx->ready);
+    fprintf(stderr, "%lld popping coroutine cur=%p new %p\n", now(), ctx->r, dill_cont(it, struct dill_cr, ready));
     it->next = NULL;
     ctx->r = dill_cont(it, struct dill_cr, ready);
     /* dill_longjmp has to be at the end of a function body, otherwise stack
@@ -403,6 +406,7 @@ int yield(void) {
     int rc = dill_canblock();
     if(dill_slow(rc < 0)) return -1;
     /* Put the current coroutine into the ready queue. */
+    fprintf(stderr, "yield/resume\n");
     dill_resume(ctx->r, 0, 0);
     /* Suspend. */
     return dill_wait();
