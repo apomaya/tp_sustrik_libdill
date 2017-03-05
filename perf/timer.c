@@ -49,7 +49,7 @@ static coroutine void worker(int64_t nw, int i, int count) {
 
 int main(int argc, char *argv[]) {
     if(argc != 2) {
-        printf("usage: go <coroutines>\n");
+        printf("Usage: %s <coroutines>\n", argv[0]);
         return 1;
     }
     long count = atol(argv[1]);
