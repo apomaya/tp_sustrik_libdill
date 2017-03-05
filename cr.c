@@ -76,6 +76,16 @@ int dill_no_blocking(int val) {
     return old;
 }
 
+/*
+ * Timer structure says we've timed out and should fire up the callback.
+ */
+static void dill_cr_timer_callback(struct dill_timers *timers,
+                              struct dill_timer_handle *timer) {
+    struct dill_tmclause *tmcl = dill_cont(timer, struct dill_tmclause, timer);
+    printf("Raising callback for timer with deadline %lld\n", tmcl->timer.deadline);
+    dill_trigger(&tmcl->cl, ETIMEDOUT);
+}
+
 /******************************************************************************/
 /*  Context.                                                                  */
 /******************************************************************************/
@@ -86,9 +96,10 @@ int dill_ctx_cr_init(struct dill_ctx_cr *ctx) {
        without calling it. */
     ctx->r = &ctx->main;
     dill_qlist_init(&ctx->ready);
-    dill_rbtree_init(&ctx->timers);
     /* We can't use now() here as the context is still being intialized. */
-    ctx->last_poll = mnow();
+    int64_t nw = mnow();
+    dill_timers_init(&ctx->timers, nw, dill_cr_timer_callback);
+    ctx->last_poll = nw;
     /* Initialize the main coroutine. */
     memset(&ctx->main, 0, sizeof(ctx->main));
     ctx->main.ready.next = NULL;
@@ -119,7 +130,7 @@ void dill_ctx_cr_term(struct dill_ctx_cr *ctx) {
 static void dill_timer_cancel(struct dill_clause *cl) {
     struct dill_ctx_cr *ctx = &dill_getctx->cr;
     struct dill_tmclause *tmcl = dill_cont(cl, struct dill_tmclause, cl);
-    dill_rbtree_erase(&ctx->timers, &tmcl->item);
+    dill_timer_unschedule(&ctx->timers, &tmcl->timer);
     /* This is a safeguard. If an item isn't properly removed from the rb-tree,
        we can spot the fact by seeing that the cr has been set to NULL. */
     tmcl->cl.cr = NULL;
@@ -130,7 +141,7 @@ void dill_timer(struct dill_tmclause *tmcl, int id, int64_t deadline) {
     struct dill_ctx_cr *ctx = &dill_getctx->cr;
     /* If the deadline is infinite, there's nothing to wait for. */
     if(deadline < 0) return;
-    dill_rbtree_insert(&ctx->timers, deadline, &tmcl->item);
+    dill_timer_schedule(&ctx->timers, &tmcl->timer, deadline);
     dill_waitfor(&tmcl->cl, id, dill_timer_cancel);
 }
 
@@ -325,42 +336,25 @@ int dill_wait(void)  {
        Still, we'll do it at least once a second. The external signal may
        very well be a deadline or a user-issued command that cancels the CPU
        intensive operation. */
-    if(dill_qlist_empty(&ctx->ready) || nw > ctx->last_poll + 1000) {
-        int block = dill_qlist_empty(&ctx->ready);
+    int block = dill_qlist_empty(&ctx->ready);
+    if(block || nw > ctx->last_poll + 1000) {
         while(1) {
             /* Compute the timeout for the subsequent poll. */
             int timeout = 0;
             if(block) {
-                if(dill_rbtree_empty(&ctx->timers))
-                    timeout = -1;
-                else {
-                    int64_t deadline = dill_cont(
-                        dill_rbtree_first(&ctx->timers),
-                        struct dill_tmclause, item)->item.val;
-                    timeout = (int) (nw >= deadline ? 0 : deadline - nw);
-                }
+                timeout = dill_timers_sleep_for(&ctx->timers, nw, 1000);
             }
             /* Wait for events. */
             int fired = dill_pollset_poll(timeout);
-            if(timeout != 0) nw = now();
+            nw = now();
             if(dill_slow(fired < 0)) continue;
             /* Fire all expired timers. */
-            if(!dill_rbtree_empty(&ctx->timers)) {
-                while(!dill_rbtree_empty(&ctx->timers)) {
-                    struct dill_tmclause *tmcl = dill_cont(
-                        dill_rbtree_first(&ctx->timers),
-                        struct dill_tmclause, item);
-                    if(tmcl->item.val > nw)
-                        break;
-                    dill_trigger(&tmcl->cl, ETIMEDOUT);
-                    fired = 1;
-                }
-            }
+            fired = dill_timers_expire(&ctx->timers, nw); /* Number of expired timers */
             /* Never retry the poll when in non-blocking mode. */
             if(!block || fired)
                 break;
-            /* If the timeout was hit but there were no expired timers, do the poll
-               again. It can happen if the timers were canceled in the
+            /* If the timeout was hit but there were no expired timers, do the
+               poll again. It can happen if the timers were canceled in the
                meantime. */
         }
         ctx->last_poll = nw;
