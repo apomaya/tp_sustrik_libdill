@@ -8,7 +8,7 @@ void dill_timers_init(struct dill_timers *timers, int64_t now, timer_fired_callb
     timers->current_now = now;
     timers->nearest_deadline = now;
     memset(timers->buckets, 0, sizeof(timers->buckets));
-    printf("Initializing timers %lld\n", now);
+    fprintf(stderr, "Initializing timers %lld\n", now);
 }
 
 unsigned dill_timers_sleep_for(struct dill_timers *timers, int64_t now,
@@ -32,7 +32,7 @@ unsigned dill_timers_expire(struct dill_timers *timers, int64_t now) {
     for(; timers->current_now <= now; timers->current_now++) {
         struct dill_timer_handle **bucket =
             &timers->buckets[timers->current_now % DILL_TIMERS_NBUCKETS];
-        printf("Current      now %lld now %lld bucket %p\n", timers->current_now, now, *bucket);
+        fprintf(stderr, "Current      now %lld now %lld bucket %p\n", timers->current_now, now, *bucket);
         struct dill_timer_handle *timer = *bucket;
         if(dill_slow(timer)) { /* Not all buckets are filled with timers. */
             struct dill_timer_handle *nt = NULL;
@@ -41,15 +41,15 @@ unsigned dill_timers_expire(struct dill_timers *timers, int64_t now) {
                                struct dill_timer_handle, list);
                 if(timer->deadline <= now) {
                     n_fired++;
-                    printf("Timer about to expire with deadline %lld\n", timer->deadline);
+                    fprintf(stderr, "Timer about to expire with deadline %lld\n", timer->deadline);
                     /* Remove the timer and fire it up. */
                     if(dill_list_empty(&timer->list)) {
-                        printf("  this was the last timer in the bucket\n");
+                        fprintf(stderr, "  this was the last timer in the bucket\n");
                         /* This is the last timer in the bucket */
                         *bucket = 0;
                         break;
                     } else {
-                        printf("  more timers in the bucket\n");
+                        fprintf(stderr, "  more timers in the bucket\n");
                         if(*bucket == timer) {
                             *bucket = nt;
                         }
@@ -74,7 +74,7 @@ void dill_timer_schedule(struct dill_timers *timers,
     struct dill_timer_handle **bucket =
         &timers->buckets[deadline % DILL_TIMERS_NBUCKETS];
     *(int64_t*)&timer->deadline = deadline;    /* const_casting. */
-    printf("Adding timer for %lld deadline\n", deadline);
+    fprintf(stderr, "Adding timer for %lld deadline\n", deadline);
     if(dill_slow(*bucket)) {
         dill_list_insert(&timer->list, &(*bucket)->list);
     } else {

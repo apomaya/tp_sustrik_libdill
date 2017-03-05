@@ -321,6 +321,7 @@ void dill_waitfor(struct dill_clause *cl, int id,
 int dill_wait(void)  {
     struct dill_ctx_cr *ctx = &dill_getctx->cr;
     /* Store the context of the current coroutine, if any. */
+    fprintf(stderr, "?\n");
     if(dill_setjmp(ctx->r->ctx)) {
         /* We get here once the coroutine is resumed. */
         dill_slist_init(&ctx->r->clauses);
@@ -337,6 +338,7 @@ int dill_wait(void)  {
        very well be a deadline or a user-issued command that cancels the CPU
        intensive operation. */
     int block = dill_qlist_empty(&ctx->ready);
+    fprintf(stderr, "blah: %d\n", block);
     if(block || nw > ctx->last_poll + 1000) {
         while(1) {
             /* Compute the timeout for the subsequent poll. */
@@ -345,11 +347,15 @@ int dill_wait(void)  {
                 timeout = dill_timers_sleep_for(&ctx->timers, nw, 1000);
             }
             /* Wait for events. */
+    fprintf(stderr, "polling with timeout %d\n", timeout);
             int fired = dill_pollset_poll(timeout);
             nw = now();
             if(dill_slow(fired < 0)) continue;
             /* Fire all expired timers. */
+        
+    fprintf(stderr, "expiring timers\n");
             fired = dill_timers_expire(&ctx->timers, nw); /* Number of expired timers */
+    fprintf(stderr, "expiring timers => %d timers fired\n", fired);
             /* Never retry the poll when in non-blocking mode. */
             if(!block || fired)
                 break;
