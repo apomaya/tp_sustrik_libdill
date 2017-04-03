@@ -149,6 +149,7 @@ static void dill_cr_close(struct hvfs *vfs);
 /******************************************************************************/
 
 static void dill_cancel(struct dill_cr *cr, int err);
+static void dill_destroy_detached();
 
 /* The initial part of go(). Allocates a new stack and handle. */
 int dill_prologue(sigjmp_buf **jb, void **ptr, size_t len,
@@ -237,13 +238,16 @@ void dill_epilogue(void) {
     struct dill_ctx_cr *ctx = &dill_getctx->cr;
     /* Mark the coroutine as finished. */
     ctx->r->done = 1;
-    if (ctx->r->detached) {
-        dill_assert(ctx->detached_cr == NULL);
-        ctx->detached_cr = ctx->r;
-    }
     /* If there's a coroutine waiting for us to finish, unblock it now. */
     if(ctx->r->closer)
         dill_cancel(ctx->r->closer, 0);
+
+    if (ctx->r->detached) {
+        dill_destroy_detached();
+        dill_assert(ctx->detached_cr == NULL);
+        ctx->detached_cr = ctx->r;
+    }
+
     /* With no clauses added, this call will never return. */
     dill_assert(dill_slist_empty(&ctx->r->clauses));
     dill_wait();
@@ -323,20 +327,24 @@ void dill_waitfor(struct dill_clause *cl, int id,
     cl->cancel = cancel;
 }
 
+void static dill_destroy_detached() {
+    struct dill_ctx_cr *ctx = &dill_getctx->cr;
+    if (ctx->detached_cr) {
+        dill_assert(ctx->detached_cr != ctx->r);
+        struct dill_cr *to_detach = ctx->detached_cr;
+        ctx->detached_cr = NULL;
+        dill_cr_close(&to_detach->vfs);
+    }
+}
+
 int dill_wait(void)  {
     struct dill_ctx_cr *ctx = &dill_getctx->cr;
     /* Store the context of the current coroutine, if any. */
     if(dill_setjmp(ctx->r->ctx)) {
+        /* We get here once the coroutine is resumed. */
         dill_slist_init(&ctx->r->clauses);
         int r_err = ctx->r->err;
-        /* We get here once the coroutine is resumed. */
-        if (ctx->detached_cr) {
-            dill_assert(ctx->detached_cr != ctx->r);
-
-            struct dill_cr *to_detach = ctx->detached_cr;
-            ctx->detached_cr = NULL;
-            dill_cr_close(&to_detach->vfs);
-        }
+        dill_destroy_detached();
         errno = r_err;
         return ctx->r->id;
     }
