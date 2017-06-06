@@ -384,6 +384,8 @@ DILL_EXPORT int tcp_connect(
 DILL_EXPORT int tcp_close(
     int s,
     int64_t deadline);
+DILL_EXPORT int tcp_disable_nagle(
+    int s);
 
 /******************************************************************************/
 /*  IPC protocol.                                                            */

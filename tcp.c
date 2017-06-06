@@ -161,6 +161,12 @@ static void tcp_hclose(struct hvfs *hvfs) {
     free(self);
 }
 
+int tcp_disable_nagle(int s) {
+    struct tcp_conn *self = hquery(s, tcp_type);
+    if(dill_slow(!self)) return -1;
+    return fd_disable_nagle(self->fd);
+}
+
 /******************************************************************************/
 /*  TCP listener socket                                                       */
 /******************************************************************************/
