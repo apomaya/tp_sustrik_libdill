@@ -41,6 +41,8 @@ void fd_initrxbuf(
     struct fd_rxbuf *rxbuf);
 int fd_unblock(
     int s);
+int fd_disable_nagle(
+    int s);
 int fd_connect(
     int s,
     const struct sockaddr *addr,

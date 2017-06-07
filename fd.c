@@ -27,6 +27,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+
 #include "fd.h"
 #include "iol.h"
 #include "utils.h"
@@ -61,6 +64,13 @@ int fd_unblock(int s) {
     rc = setsockopt (s, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof (opt));
     dill_assert (rc == 0 || errno == EINVAL);
 #endif
+    return 0;
+}
+
+int fd_disable_nagle(int s) {
+    int val = 1;
+    int rc = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
+    dill_assert(rc == 0);
     return 0;
 }
 
